@@ -1,0 +1,243 @@
+@import "tailwindcss";
+
+/* 将棋ゲーム用カスタムスタイル */
+:root {
+  /* 榧の木目カラー */
+  --kaya-light: #e8d4a8;
+  --kaya-dark: #c4a35a;
+  --kaya-grain: #d4bc7c;
+  
+  /* 駒の色 */
+  --piece-wood: #f5e6c8;
+  --piece-border: #8b7355;
+  --piece-text: #1a1a1a;
+  --piece-promoted: #c41e3a;
+  
+  /* 畳の色 */
+  --tatami-light: #c4b896;
+  --tatami-dark: #a89968;
+  
+  /* UI色 */
+  --accent-gold: #c9a227;
+  --accent-red: #8b0000;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Hiragino Kaku Gothic Pro", "Yu Gothic", "Meiryo", sans-serif;
+  background: linear-gradient(135deg, var(--tatami-light) 0%, var(--tatami-dark) 100%);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 木目テクスチャ用ユーティリティ */
+.wood-texture {
+  background: 
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 2px,
+      rgba(139, 115, 85, 0.03) 2px,
+      rgba(139, 115, 85, 0.03) 4px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 20px,
+      rgba(139, 115, 85, 0.05) 20px,
+      rgba(139, 115, 85, 0.05) 40px
+    ),
+    linear-gradient(135deg, var(--kaya-light) 0%, var(--kaya-grain) 50%, var(--kaya-dark) 100%);
+}
+
+/* 駒の五角形 */
+.piece-shape {
+  clip-path: polygon(50% 0%, 100% 25%, 100% 100%, 0% 100%, 0% 25%);
+}
+
+/* アニメーション */
+@keyframes piece-slide {
+  0% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes piece-capture {
+  0% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  25% {
+    transform: scale(1.3);
+    filter: brightness(1.2);
+  }
+  50% {
+    transform: scale(1.15) rotate(5deg);
+  }
+  75% {
+    transform: scale(1.05) rotate(-3deg);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    filter: brightness(1);
+  }
+}
+
+@keyframes piece-promote {
+  0% {
+    transform: scale(1);
+    filter: brightness(1) hue-rotate(0deg);
+  }
+  30% {
+    transform: scale(1.2);
+    filter: brightness(1.3) hue-rotate(10deg);
+  }
+  50% {
+    transform: scale(1.25);
+    filter: brightness(1.5) hue-rotate(20deg);
+    box-shadow: 0 0 20px rgba(196, 30, 58, 0.5);
+  }
+  70% {
+    transform: scale(1.15);
+    filter: brightness(1.2) hue-rotate(10deg);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1) hue-rotate(0deg);
+  }
+}
+
+@keyframes thinking-pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-slide {
+  animation: piece-slide 0.3s ease-out forwards;
+}
+
+.animate-capture {
+  animation: piece-capture 0.4s ease-in-out forwards;
+}
+
+.animate-promote {
+  animation: piece-promote 0.5s ease-in-out forwards;
+}
+
+.animate-thinking {
+  animation: thinking-pulse 1.5s ease-in-out infinite;
+}
+
+/* スクロールバースタイル */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--tatami-light);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--kaya-dark);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--piece-border);
+}
+
+/* モバイル対応 */
+@media (max-width: 768px) {
+  body {
+    overflow-x: hidden;
+  }
+  
+  #root {
+    padding: 0.5rem;
+  }
+}
+
+/* タッチデバイス対応 */
+@media (hover: none) and (pointer: coarse) {
+  /* タップしやすくするためのスタイル */
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* ホバー効果を無効化 */
+  .hover\:bg-amber-300\/30:hover {
+    background-color: transparent;
+  }
+}
+
+/* レスポンシブ盤面 */
+.board-container {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* スモールスクリーン向け盤面サイズ調整 */
+@media (max-width: 480px) {
+  .board-cell {
+    width: 2.25rem !important;
+    height: 2.25rem !important;
+  }
+  
+  .piece-sm {
+    transform: scale(0.75);
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .board-cell {
+    width: 2.5rem !important;
+    height: 2.5rem !important;
+  }
+  
+  .piece-md {
+    transform: scale(0.85);
+  }
+}
+
+/* PWA対応 */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .game-container {
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--piece-border);
+}

@@ -1,0 +1,19 @@
+{
+  "name": "将棋 - Professional Shogi Game",
+  "short_name": "将棋",
+  "description": "美しい駒とAI対戦機能を備えたプロフェッショナルな将棋ゲーム",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#c4b896",
+  "theme_color": "#78350f",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/shogi-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "categories": ["games", "entertainment"],
+  "lang": "ja"
+}

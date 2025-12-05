@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="woodGrain" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f5e6c8"/>
+      <stop offset="50%" stop-color="#e8d4a8"/>
+      <stop offset="100%" stop-color="#dcc896"/>
+    </linearGradient>
+  </defs>
+  <!-- 将棋駒の形状 -->
+  <path 
+    d="M50 5 L90 25 L85 95 L15 95 L10 25 Z" 
+    fill="url(#woodGrain)" 
+    stroke="#8b7355" 
+    stroke-width="2"
+  />
+  <!-- 漢字「王」 -->
+  <text 
+    x="50" 
+    y="62" 
+    text-anchor="middle" 
+    font-family="Yu Mincho, serif" 
+    font-size="36" 
+    font-weight="bold" 
+    fill="#1a1a1a"
+  >王</text>
+</svg>
