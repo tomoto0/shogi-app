@@ -348,13 +348,13 @@ export function getAllLegalMoves(state: GameState): Move[] {
 // ========================================
 
 /**
- * 詰みかどうかチェック
+ * 詰みかどうかチェック（持ち駒を打つ手も考慮した完全版）
  */
-export function isCheckmate(board: Board, player: Player): boolean {
+export function isCheckmate(board: Board, player: Player, hand?: Hand): boolean {
   // 王手されているか
   if (!isInCheck(board, player)) return false;
   
-  // 逃げる手があるか（簡易版：駒を動かす手のみチェック）
+  // 1. 駒を動かして王手を回避できるかチェック
   for (let row = 0; row < 9; row++) {
     for (let col = 0; col < 9; col++) {
       const piece = board[row][col];
@@ -374,12 +374,87 @@ export function isCheckmate(board: Board, player: Player): boolean {
           if (isLegalMove(board, move, player)) {
             return false; // 逃げる手がある
           }
+          
+          // 成りの手もチェック
+          if (canPromote(piece.type) && !isPromotedPiece(piece.type)) {
+            const promoteMove: MoveAction = {
+              type: 'move',
+              from,
+              to,
+              piece: piece.type,
+              promote: true,
+            };
+            if (isLegalMove(board, promoteMove, player)) {
+              return false; // 成って逃げる手がある
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  // 2. 持ち駒を打って王手を回避できるかチェック
+  if (hand) {
+    const handPieces: HandPieceType[] = ['rook', 'bishop', 'gold', 'silver', 'knight', 'lance', 'pawn'];
+    
+    for (const pieceType of handPieces) {
+      if (hand[pieceType] <= 0) continue;
+      
+      for (let row = 1; row <= 9; row++) {
+        for (let col = 1; col <= 9; col++) {
+          const to: Position = { col: col as Column, row: row as Row };
+          const drop: DropAction = {
+            type: 'drop',
+            to,
+            piece: pieceType,
+          };
+          
+          // 打てる場所かチェック（打ち歩詰めチェックは除外して判定）
+          if (isLegalDropForCheckEscape(board, drop, player, hand)) {
+            return false; // 駒を打って逃げる手がある
+          }
         }
       }
     }
   }
   
   return true; // 逃げる手がない = 詰み
+}
+
+/**
+ * 王手回避のための駒打ちが合法かチェック（打ち歩詰めチェックは行わない）
+ * isCheckmateから呼ばれる際に、無限ループを防ぐため
+ */
+function isLegalDropForCheckEscape(
+  board: Board,
+  drop: DropAction,
+  player: Player,
+  hand: Hand
+): boolean {
+  // 持ち駒を持っているか
+  if (hand[drop.piece] <= 0) return false;
+  
+  // 打つ位置が空いているか
+  const targetPiece = getPieceAt(board, drop.to);
+  if (targetPiece) return false;
+  
+  // 移動不能位置への打ちは禁止
+  if (isDeadPosition(drop.piece, drop.to, player)) return false;
+  
+  // 二歩チェック
+  if (drop.piece === 'pawn') {
+    const { colIndex } = positionToIndex(drop.to);
+    for (let row = 0; row < 9; row++) {
+      const piece = board[row][colIndex];
+      if (piece && piece.type === 'pawn' && piece.owner === player && !piece.isPromoted) {
+        return false;
+      }
+    }
+  }
+  
+  // 自玉を王手から救えるかチェック
+  const newBoard = applyDrop(board, drop, player);
+  return !isInCheck(newBoard, player);
 }
 
 /**

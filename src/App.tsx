@@ -371,13 +371,25 @@ function App() {
           // 駒を打つ
           executeDrop(move.piece, move.to)
         }
+      } else {
+        // AIに合法手がない場合 → 詰みまたはステイルメート
+        // プレイヤーの勝利として処理
+        const newState: GameState = {
+          ...gameState,
+          result: {
+            type: 'checkmate',
+            winner: playerColor,
+          }
+        }
+        setGameState(newState)
+        playSound('gameEnd')
       }
     } catch (error) {
       console.error('AI error:', error)
     } finally {
       setIsAiThinking(false)
     }
-  }, [gameMode, currentPlayer, playerColor, result, isAiThinking, gameState, aiLevel, board, executeMoveWithPromotion, executeDrop])
+  }, [gameMode, currentPlayer, playerColor, result, isAiThinking, gameState, aiLevel, board, executeMoveWithPromotion, executeDrop, setGameState, playSound])
 
   // AIの手番になったら自動的に手を打つ
   useEffect(() => {

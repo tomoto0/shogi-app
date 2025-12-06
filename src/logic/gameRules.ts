@@ -205,11 +205,11 @@ export function isPerpeturalCheck(state: GameState): { isPerpetual: boolean; los
  * ゲーム結果を判定
  */
 export function checkGameResult(state: GameState): GameResult {
-  const { board, currentPlayer } = state;
+  const { board, hands, currentPlayer } = state;
   const opponent = currentPlayer === 'sente' ? 'gote' : 'sente';
   
-  // 詰みチェック
-  if (isCheckmate(board, currentPlayer)) {
+  // 詰みチェック（持ち駒も考慮）
+  if (isCheckmate(board, currentPlayer, hands[currentPlayer])) {
     return { type: 'checkmate', winner: opponent };
   }
   
