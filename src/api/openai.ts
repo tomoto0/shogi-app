@@ -1,11 +1,14 @@
 // OpenAI GPT-4o API クライアント
 // 多段階戦略的推論による将棋AI
 // レベルに応じて推論の深さと複雑さが進化
+// 
+// 新しい実装: multiStageEngine.ts を使用
 
 import type { GameState, Move, AllPieceType, AILevel } from '../types'
 import { getAllLegalMoves, isInCheck, applyMove, applyDrop } from '../logic/legalMoves'
 import { toHandPieceType, addToHand, removeFromHand } from '../logic/board'
 import { PIECE_KANJI } from '../types'
+import { selectMultiStageMove, resetStrategicMemory, isLLMConfigured } from '../ai/multiStageEngine'
 
 // ========================================
 // API設定
@@ -474,15 +477,17 @@ async function callOpenAI(
 }
 
 // ========================================
-// レベル別の多段階推論システム
+// レベル別の多段階推論システム（レガシー、後方互換性のため残存）
+// 新しい実装は multiStageEngine.ts を使用
 // ========================================
 
 /**
+ * @deprecated 新しい multiStageEngine.ts を使用してください
  * 初級LLM: 2段階推論
  * ステージ1: 簡易局面分析
  * ステージ2: 候補手から直感的に選択
  */
-async function selectBeginnerLLMMove(state: GameState, legalMoves: Move[]): Promise<AdvancedLLMResult> {
+export async function selectBeginnerLLMMove(state: GameState, legalMoves: Move[]): Promise<AdvancedLLMResult> {
   const thinking: string[] = []
   thinking.push('🔰 初級LLM AI - 2段階推論')
 
@@ -526,12 +531,13 @@ async function selectBeginnerLLMMove(state: GameState, legalMoves: Move[]): Prom
 }
 
 /**
+ * @deprecated 新しい multiStageEngine.ts を使用してください
  * 中級LLM: 3段階推論
  * ステージ1: 局面分析（ミニマックス評価併用）
  * ステージ2: 候補手を評価値でスコアリング（上位15手）
  * ステージ3: LLMが選択
  */
-async function selectIntermediateLLMMove(state: GameState, legalMoves: Move[]): Promise<AdvancedLLMResult> {
+export async function selectIntermediateLLMMove(state: GameState, legalMoves: Move[]): Promise<AdvancedLLMResult> {
   const thinking: string[] = []
   thinking.push('⭐ 中級LLM AI - 3段階推論')
 
@@ -625,13 +631,14 @@ async function selectIntermediateLLMMove(state: GameState, legalMoves: Move[]): 
 }
 
 /**
+ * @deprecated 新しい multiStageEngine.ts を使用してください
  * 上級LLM: 4段階推論
  * ステージ1: 深い局面分析（LLM）
  * ステージ2: 定石考慮（序盤のみ）
  * ステージ3: ミニマックス+LLMで候補手評価（上位20手）
  * ステージ4: LLMが3手先の読みで最終選択
  */
-async function selectAdvancedLLMMove_Internal(state: GameState, legalMoves: Move[]): Promise<AdvancedLLMResult> {
+export async function selectAdvancedLLMMove_Internal(state: GameState, legalMoves: Move[]): Promise<AdvancedLLMResult> {
   const thinking: string[] = []
   thinking.push('💪 上級LLM AI - 4段階推論')
 
@@ -813,13 +820,14 @@ ${candidateText}
 }
 
 /**
+ * @deprecated 新しい multiStageEngine.ts を使用してください
  * LLM AI（フルパワー）: 4段階推論 + 戦略的記憶
  * ステージ1: 深い局面分析（駒の効き、玉の安全度、攻防態勢）
  * ステージ2: 定石データベース参照
  * ステージ3: ミニマックス+αβで候補手を深く評価（上位20手）
  * ステージ4: GPT-4oが5手先の読みを含む深い推論で最終選択
  */
-async function selectFullPowerLLMMove(state: GameState, legalMoves: Move[]): Promise<AdvancedLLMResult> {
+export async function selectFullPowerLLMMove(state: GameState, legalMoves: Move[]): Promise<AdvancedLLMResult> {
   const thinking: string[] = []
   thinking.push('🤖 LLM AI（フルパワー）- 4段階戦略推論')
 
@@ -1094,25 +1102,18 @@ ${candidateText}
 
 /**
  * レベルに応じた多段階推論LLM AIの手を選択
+ * 新しいマルチステージエンジンを使用
  */
 export async function selectAdvancedLLMMove(state: GameState, level?: AILevel): Promise<AdvancedLLMResult | null> {
-  const legalMoves = getAllLegalMoves(state)
-  if (legalMoves.length === 0) return null
-
-  // レベルに応じて異なる推論システムを使用
-  // デフォルトはフルパワー（LLMレベル）
-  const aiLevel = level || 'llm'
-
-  switch (aiLevel) {
-    case 'beginner':
-      return selectBeginnerLLMMove(state, legalMoves)
-    case 'intermediate':
-      return selectIntermediateLLMMove(state, legalMoves)
-    case 'advanced':
-      return selectAdvancedLLMMove_Internal(state, legalMoves)
-    case 'llm':
-    default:
-      return selectFullPowerLLMMove(state, legalMoves)
+  // 新しいマルチステージエンジンを使用
+  const result = await selectMultiStageMove(state, level || 'llm')
+  if (!result) return null
+  
+  return {
+    move: result.move,
+    thinking: result.thinking,
+    evaluation: result.evaluation,
+    strategicAnalysis: result.strategicAnalysis,
   }
 }
 
@@ -1129,6 +1130,8 @@ export function resetStrategicContext(): void {
     opportunities: [],
     previousAnalyses: [],
   }
+  // 新しいエンジンのメモリもリセット
+  resetStrategicMemory()
 }
 
 // ========================================
@@ -1136,5 +1139,5 @@ export function resetStrategicContext(): void {
 // ========================================
 
 export function isOpenAIConfigured(): boolean {
-  return OPENAI_API_KEY.length > 0
+  return OPENAI_API_KEY.length > 0 || isLLMConfigured()
 }

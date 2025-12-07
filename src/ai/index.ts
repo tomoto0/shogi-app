@@ -1,11 +1,18 @@
 // AI モジュールのエントリーポイント
 // すべてのレベルでLLM多段階推論AIを使用
 import type { GameState, AILevel } from '../types'
-import { selectAdvancedLLMMove, isOpenAIConfigured } from '../api/openai'
+import { isOpenAIConfigured, resetStrategicContext } from '../api/openai'
+import { selectMultiStageMove, resetStrategicMemory, isLLMConfigured } from './multiStageEngine'
 import { selectBeginnerMove, type AIThinkResult } from './beginner'
 import { selectIntermediateMove, selectAdvancedMove } from './intermediate'
 
 export type { AIThinkResult }
+
+// 新しいモジュールをエクスポート
+export { evaluatePosition, quickEvaluate, getEvaluationText } from './evaluation'
+export { getTopMoves, rankMoves, describeMoves } from './moveRanking'
+export { findApplicableJoseki, formatJosekiForPrompt, JOSEKI_DATABASE } from './joseki'
+export { selectMultiStageMove, resetStrategicMemory } from './multiStageEngine'
 
 /**
  * AIに手を考えさせる
@@ -17,9 +24,10 @@ export async function thinkMove(
   level: AILevel
 ): Promise<AIThinkResult | null> {
   // OpenAI APIが設定されていればLLM多段階推論を使用
-  if (isOpenAIConfigured()) {
+  if (isOpenAIConfigured() || isLLMConfigured()) {
     try {
-      const result = await selectAdvancedLLMMove(state, level)
+      // 新しいマルチステージエンジンを優先使用
+      const result = await selectMultiStageMove(state, level)
       if (result) {
         return {
           move: result.move,
@@ -29,7 +37,7 @@ export async function thinkMove(
         }
       }
     } catch (error) {
-      console.warn('LLM AI failed, falling back to traditional AI:', error)
+      console.warn('MultiStage AI failed, falling back to traditional AI:', error)
     }
   }
 
@@ -54,4 +62,12 @@ export async function thinkMove(
     default:
       return null
   }
+}
+
+/**
+ * ゲーム開始時にAIの戦略メモリをリセット
+ */
+export function resetAI(): void {
+  resetStrategicContext()
+  resetStrategicMemory()
 }
