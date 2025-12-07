@@ -95,6 +95,69 @@ export function isDefensiveMove(move: Move, player: Player): boolean {
   }
 }
 
+/**
+ * 手の安全性をチェック（タダ取りされないか）
+ * 移動先が相手に攻撃されているかを確認
+ */
+function isSafeMove(state: GameState, move: Move): { safe: boolean; risk: number } {
+  const { board, currentPlayer } = state
+  
+  // 駒打ちの場合
+  let newBoard: GameState['board']
+  if (move.type === 'move') {
+    const result = applyMove(board, move)
+    newBoard = result.newBoard
+  } else {
+    newBoard = applyDrop(board, move, currentPlayer)
+  }
+  
+  const opponent = currentPlayer === 'sente' ? 'gote' : 'sente'
+  
+  // 仮の状態を作成
+  const tempState: GameState = {
+    ...state,
+    board: newBoard,
+    currentPlayer: opponent,
+  }
+  
+  // 相手の手を生成
+  const opponentMoves = getAllLegalMoves(tempState)
+  
+  // 移動先を攻撃できる相手の手を探す
+  const attacksOnTarget = opponentMoves.filter(m => 
+    m.type === 'move' && 
+    m.to.col === move.to.col && 
+    m.to.row === move.to.row &&
+    m.captured
+  )
+  
+  if (attacksOnTarget.length === 0) {
+    return { safe: true, risk: 0 }
+  }
+  
+  // 移動した駒の価値
+  const movedPieceValue = PIECE_VALUES[move.piece as keyof typeof PIECE_VALUES] || 0
+  
+  // 取った駒の価値（駒取りの場合）
+  const capturedValue = move.type === 'move' && move.captured ? PIECE_VALUES[move.captured] : 0
+  
+  // 最も価値の低い駒で取られた場合のリスク
+  const lowestAttackerValue = attacksOnTarget.reduce((min, m) => {
+    if (m.type !== 'move') return min
+    const value = PIECE_VALUES[m.piece as keyof typeof PIECE_VALUES] || 0
+    return value < min ? value : min
+  }, Infinity)
+  
+  // リスク計算: 取られる駒 - 取った駒
+  const risk = movedPieceValue - capturedValue
+  
+  // 取った駒の価値が移動した駒以上なら安全
+  // または、取り返しが期待できる場合も考慮
+  const safe = capturedValue >= movedPieceValue || lowestAttackerValue >= movedPieceValue
+  
+  return { safe, risk: safe ? 0 : risk }
+}
+
 // ========================================
 // 手のスコアリング
 // ========================================
@@ -174,6 +237,18 @@ export function scoreMove(state: GameState, move: Move): MoveScore {
   if (move.type === 'move' && !move.promote && canPromote(move, currentPlayer)) {
     // あえて成らない手は通常低評価（不成りが有効なケースもあるが）
     score -= 50
+  }
+  
+  // 9. 安全性チェック（タダ取りされる手は大幅減点）
+  const safety = isSafeMove(state, move)
+  if (!safety.safe) {
+    // タダ取りされるリスクに応じて減点
+    score -= safety.risk
+    if (safety.risk >= 500) {
+      features.push('⚠️危険')
+    } else if (safety.risk >= 200) {
+      features.push('注意')
+    }
   }
   
   // 優先度を決定

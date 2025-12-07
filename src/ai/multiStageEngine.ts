@@ -199,13 +199,85 @@ async function callOpenAI(
 }
 
 // ========================================
-// ミニマックス法
+// ミニマックス法 + 静止探索（Quiescence Search）
 // ========================================
 
 interface MinimaxResult {
   score: number
   move: Move | null
   nodesSearched: number
+}
+
+/**
+ * 静止探索（Quiescence Search）
+ * 駒取りが続く限り読み続けることで、読みの途中で評価することを防ぐ
+ */
+function quiescenceSearch(
+  state: GameState,
+  alpha: number,
+  beta: number,
+  maximizing: boolean,
+  nodesSearched: { count: number },
+  depth: number = 0
+): number {
+  nodesSearched.count++
+  
+  // 静止探索の深さ制限（無限ループ防止）
+  const MAX_QUIESCENCE_DEPTH = 6
+  if (depth >= MAX_QUIESCENCE_DEPTH) {
+    return quickEvaluate(state)
+  }
+  
+  // スタンドパット（現在の評価値）
+  const standPat = quickEvaluate(state)
+  
+  if (maximizing) {
+    if (standPat >= beta) return beta  // ベータカットオフ
+    if (standPat > alpha) alpha = standPat
+  } else {
+    if (standPat <= alpha) return alpha  // アルファカットオフ
+    if (standPat < beta) beta = standPat
+  }
+  
+  // 駒取りの手のみを生成
+  const allMoves = getAllLegalMoves(state)
+  const captureMoves = allMoves.filter(m => m.type === 'move' && m.captured)
+  
+  // 駒取りがなければ静止状態
+  if (captureMoves.length === 0) {
+    return standPat
+  }
+  
+  // 駒取りを価値順にソート（MVV-LVA: Most Valuable Victim - Least Valuable Attacker）
+  const sortedCaptures = captureMoves.sort((a, b) => {
+    if (a.type !== 'move' || b.type !== 'move') return 0
+    const aValue = a.captured ? PIECE_VALUES[a.captured] - PIECE_VALUES[a.piece] * 0.1 : 0
+    const bValue = b.captured ? PIECE_VALUES[b.captured] - PIECE_VALUES[b.piece] * 0.1 : 0
+    return bValue - aValue
+  })
+  
+  for (const move of sortedCaptures) {
+    // デルタ枝刈り：取る駒の価値が低すぎる場合はスキップ
+    if (move.type === 'move' && move.captured) {
+      const captureValue = PIECE_VALUES[move.captured]
+      const DELTA_MARGIN = 200
+      if (maximizing && standPat + captureValue + DELTA_MARGIN < alpha) continue
+      if (!maximizing && standPat - captureValue - DELTA_MARGIN > beta) continue
+    }
+    
+    const newState = applyMoveToState(state, move)
+    const score = quiescenceSearch(newState, alpha, beta, !maximizing, nodesSearched, depth + 1)
+    
+    if (maximizing) {
+      if (score > alpha) alpha = score
+      if (alpha >= beta) break
+    } else {
+      if (score < beta) beta = score
+      if (alpha >= beta) break
+    }
+  }
+  
+  return maximizing ? alpha : beta
 }
 
 function minimax(
@@ -219,7 +291,9 @@ function minimax(
   nodesSearched.count++
 
   if (depth === 0) {
-    return { score: quickEvaluate(state), move: null, nodesSearched: nodesSearched.count }
+    // 静止探索を呼び出し
+    const score = quiescenceSearch(state, alpha, beta, maximizing, nodesSearched)
+    return { score, move: null, nodesSearched: nodesSearched.count }
   }
 
   const moves = getAllLegalMoves(state)
@@ -231,10 +305,23 @@ function minimax(
     return { score: 0, move: null, nodesSearched: nodesSearched.count }
   }
 
-  // 手を並び替え（駒取り優先）
+  // 手を並び替え（駒取り、王手、成り優先）
   const sortedMoves = moves.sort((a, b) => {
-    const aScore = a.type === 'move' && a.captured ? PIECE_VALUES[a.captured] : 0
-    const bScore = b.type === 'move' && b.captured ? PIECE_VALUES[b.captured] : 0
+    let aScore = 0
+    let bScore = 0
+    
+    // 駒取りの価値（MVV-LVA）
+    if (a.type === 'move' && a.captured) {
+      aScore += PIECE_VALUES[a.captured] * 10 - PIECE_VALUES[a.piece]
+    }
+    if (b.type === 'move' && b.captured) {
+      bScore += PIECE_VALUES[b.captured] * 10 - PIECE_VALUES[b.piece]
+    }
+    
+    // 成りボーナス
+    if (a.type === 'move' && a.promote) aScore += 300
+    if (b.type === 'move' && b.promote) bScore += 300
+    
     return bScore - aScore
   })
 
